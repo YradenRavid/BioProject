@@ -1,9 +1,50 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 import os
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+import csv
+import pandas as pd
+import sys
+import numpy as np
+#mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
-path = "/home/u12784/bio/BioProject"
+#one hot encoding
+def oneHot(string):
+    trantab = str.maketrans('ACGT', '0123')
+    string = string + 'ACGT'
+    data = list(string.translate(trantab))
+    return tf.keras.utils.to_categorical(data)[0:-4]
+
+# read pbm
+pbm = csv.reader(open("TF123_pbm.txt",mode = 'r'))#, delimiter='\t')
+
+num_of_rows = sum(1 for row in pbm)
+pbm_onehot = np.zeros([num_of_rows,36,4])
+pbm = csv.reader(open("TF123_pbm.txt",mode = 'r'))
+i = 0
+for rows in pbm:
+    str=rows[0]
+    pbm_onehot[i,:,:]=oneHot(str[:36])
+    i= i+1
+
+pbm_tensor = tf.convert_to_tensor(pbm_onehot)
+
+
+selex=[csv.reader(open(x ,mode = 'r'), delimiter='\t') for x in sys.argv[2:]]
+for rows in selex:
+    seq = rows[0]
+    val = rows[1]
+    mydict = {k: v for k, v in rows}
+    
+for row in pbm:
+    row_size = len(row[0])
+    break
+
+
+path = os.getcwd()
+#path = "/home/u12784/bio/BioProject"
+
+
+
 
 #define a simple convolutional layer
 def conv_layer(input, channels_in, channels_out, name = "conv"):
@@ -84,4 +125,9 @@ for i in range(2001):
         print("step %d, training accuracy %g" % (i, train_accuracy))
 
     # Run the training step
-    sess.run(train_step, feed_dict = {x: batch[0], y: batch[1]})
+sess.run(train_step, feed_dict = {x: batch[0], y: batch[1]})
+
+from sklearn.metrics import average_precision_score
+predict=model.predict(np.array(test))
+true=[int(x) for x in np.append(np.ones(100), np.zeros(len(test)-100), axis=0)]
+print(average_precision_score(true, predict))
