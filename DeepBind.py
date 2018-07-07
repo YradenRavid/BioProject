@@ -3,12 +3,12 @@ from tensorflow.examples.tutorials.mnist import input_data
 import os
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
-path = os.getcwd()
+path = "/home/u12784/bio/BioProject"
 
 #define a simple convolutional layer
 def conv_layer(input, channels_in, channels_out, name = "conv"):
     with tf.name_scope(name):
-        w = tf.Variable(tf.truncated_normal([5,5,channels_in,channels_out]), name = "W")
+        w = tf.Variable(tf.truncated_normal([5,5,channels_in,channels_out], stddev = 0.1), name = "W")
         b = tf.Variable(tf.constant(0.1 , shape = [channels_out]), name = "b")
         conv = tf.nn.conv2d(input, w, strides=[1,1,1,1],padding="SAME")
         act = tf.nn.relu(conv +b)
@@ -20,8 +20,8 @@ def conv_layer(input, channels_in, channels_out, name = "conv"):
 #fully connected layer
 def fc_layer(input, channels_in, channels_out, name = "FC"):
     with tf.name_scope(name):
-        w = tf.Variable(tf.zeros([channels_in,channels_out]), name = "W")
-        b = tf.Variable(tf.zeros([channels_out]), name = "b")
+        w = tf.Variable(tf.truncated_normal([channels_in,channels_out], stddev = 0.1), name = "W")
+        b = tf.Variable(tf.constant(0.1,shape = [channels_out]), name = "b")
         act = tf.nn.relu(tf.matmul(input,w)+b)
         return act
 
@@ -72,16 +72,15 @@ sess.run(tf.global_variables_initializer())
 writer = tf.summary.FileWriter(path + '/graph')
 writer.add_graph(sess.graph)
 
-#Train for 2000 step
-for i in range(2000):
+#Train for 2001 step
+for i in range(2001):
     batch = mnist.train.next_batch(100)
     if i % 5 == 0:
-        s = sess.run(merged_summary, feed_dict = {x: batch[0], y: batch[1]})
+        [train_accuracy,s] = sess.run([accuracy,merged_summary], feed_dict = {x: batch[0], y: batch[1]})
         writer.add_summary(s, i)
 
     #Occasionally report accuracy
     if i % 500 == 0:
-        [train_accuracy] = sess.run([accuracy], feed_dict = {x: batch[0], y: batch[1]})
         print("step %d, training accuracy %g" % (i, train_accuracy))
 
     # Run the training step
