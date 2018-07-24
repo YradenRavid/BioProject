@@ -12,8 +12,14 @@ import time
 
 #[input_data, labels, test] = DataLoaders.get_input_and_labels(DataLoaders,13,6,100000)
 
+
+# local variables
+TF_NUM = 123
+ROWS_NUM=1000
+EPOCHS = 5
+BATCH_SIZE = 100
 path = os.getcwd()
-# path = "/home/u12784/bio/BioProject"
+# path = "/home/u12784/bio/BioProject/TF13"
 
 
 def oneHot(string):
@@ -25,9 +31,10 @@ def oneHot(string):
 
 def read_selex_csv_to_array(experiment_name, selex_num, rows_to_read, train_data=True):
     #path = os.path.join(os.path.expanduser('~'), 'hello-world','train/' if train_data else 'test/')
+    path = "/home/u12784/bio/BioProject/TF13"
     path = os.getcwd()
     while(1):
-        selex_name = path +'\\'+ experiment_name + '_selex_' + str(selex_num) + '.txt'
+        selex_name = path +'/'+ experiment_name + '_selex_' + str(selex_num) + '.txt'
         if os.path.isfile(selex_name):
             break
         else:
@@ -41,9 +48,10 @@ def read_selex_csv_to_array(experiment_name, selex_num, rows_to_read, train_data
     return np.array(list(data))
 
 def read_pbm_to_array(ex_name, train_data=True):
-    #path = os.path.join(os.path.expanduser('~'), 'hello-world', 'train/' if train_data else 'test/')
+    # path = os.path.join(os.path.expanduser('~'), 'hello-world', 'train/' if train_data else 'test/')
+    # path = "/home/u12784/bio/BioProject/TF13"
     path = os.getcwd()
-    pbm_name = path +'\\'+ ex_name + '_pbm.txt'
+    pbm_name = path +'/'+ ex_name + '_pbm.txt'
     pbm = pd.read_csv(pbm_name, header=-1, names=['seq', 'int'])
     data = map(oneHot, pbm['seq'])
     test = np.array(list(data))
@@ -73,14 +81,14 @@ def get_input_and_labels(n, max_selex_idx, rows_number):
 # define a simple convolutional layer
 def conv_layer(input, channels_in, channels_out, name="conv"):
     with tf.name_scope(name):
-        w = tf.Variable(tf.truncated_normal([6, 4, channels_in, channels_out], stddev=0.1), name="W")
+        w = tf.Variable(tf.truncated_normal([12, 1, channels_in, channels_out], stddev=0.1), name="W")
         b = tf.Variable(tf.constant(0.1, shape=[channels_out]), name="b")
-        conv = tf.nn.conv2d(input, w, strides=[1, 1, 1, 1])
+        conv = tf.nn.conv2d(input, w, strides=[1, 1, 1, 1], padding="SAME")
         act = tf.nn.relu(conv + b)
         tf.summary.histogram("weights", w)
         tf.summary.histogram("biases", b)
         tf.summary.histogram("activations", act)
-        return tf.nn.max_pool(act, ksize=[1, 2, 1, 1], strides=[1, 1, 1, 1], padding="SAME")
+        return tf.nn.max_pool(act, ksize=[1, 4, 1, 1], strides=[1, 4, 1, 1], padding="SAME")
 
 
 # fully connected layer
@@ -92,24 +100,36 @@ def fc_layer(input, channels_in, channels_out, name="FC"):
         return act
 
 
-
-[input_data, labels, test] = get_input_and_labels(13,6,100000)
-
+# reset session and tensorboard
 tf.reset_default_graph()
 sess = tf.Session()
 
+# get data
+[input_data, labels, test] = get_input_and_labels(TF_NUM,6,ROWS_NUM)
+train_data = [input_data, labels]
+test_data = test
+
 # Set placeholders and reshape the data:
-x = tf.placeholder(tf.float32, shape=[None, input_data.shape[1], 4], name="input")
-y = tf.placeholder(tf.float32, shape=[None, 10], name="labels")
-x_seq = tf.reshape(x, [-1, input_data.shape[1], 4, 1])
+x = tf.placeholder(tf.float32, shape=[2*ROWS_NUM, input_data.shape[1] * 4], name="input")
+y = tf.placeholder(tf.float32, shape=[2*ROWS_NUM, 10], name="labels")
+x_seq = tf.reshape(x, [-1, input_data.shape[1] * 4, 1, 1])
 tf.summary.image("input", x_seq, 3)
+
+# Set database:
+dataset = tf.data.Dataset.from_tensor_slices((x_seq, y)).repeat().batch(BATCH_SIZE)
+dataset = dataset.shuffle(buffer_size=100)
+
+# init data
+iter = dataset.make_initializable_iterator()
+seqs, seqs_val = iter.get_next()
 
 # Create the network
 
 # Convulotional layer
-conv1 = conv_layer(x_seq, 1, 32, "conv1")
+conv1 = conv_layer(seqs, 1, 32, "conv1")
 conv2 = conv_layer(conv1, 32, 64, "conv2")
-flat_len_c2d = conv2.shape[1] * conv2.shape[2] * conv2.shape[3]
+sizelist=conv2.get_shape().as_list()
+flat_len_c2d = sizelist[1]*sizelist[2]*sizelist[3]
 flattened = tf.reshape(conv2, [-1, flat_len_c2d])
 
 # fully connected layer
@@ -118,7 +138,7 @@ logits = fc_layer(fc1, 128, 10, "fc2")
 
 # cross entropy - as loss function
 with tf.name_scope("cross_entrupy"):
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y))
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=seqs_val))
     tf.summary.scalar("cross_entropy", cross_entropy)
 
 # Use Adam optimizer to train the network
@@ -138,31 +158,29 @@ merged_summary = tf.summary.merge_all()
 sess.run(tf.global_variables_initializer())
 
 # tensorboard
-writer = tf.summary.FileWriter(path + '/graph2')
+writer = tf.summary.FileWriter(path + '/graph')
 writer.add_graph(sess.graph)
 
-batch = tf.train.batch([x_seq, y], batch_size=100)
-"""
+sess.run(iter.initializer, feed_dict={ x: train_data[0], y: train_data[1]})
+print('Training...')
+
 # Train for 2001 step
-for i in range(2001):
-    batch = tf.train.batch([],100)
-    if i % 5 == 0:
-        [train_accuracy, s] = sess.run([accuracy, merged_summary], feed_dict={x: batch[0], y: batch[1]})
-        writer.add_summary(s, i)
+for i in range(EPOCHS):
+    for i in range(2001):
+        sess.run(train_step, feed_dict={x: train_data[0], y: train_data[1]})
+        if i % 5 == 0:
+            [train_accuracy, s] = sess.run([accuracy, merged_summary], feed_dict={x: train_data[0], y: train_data[1]})
+            writer.add_summary(s, i)
+        # Occasionally report accuracy
+        if i % 500 == 0:
+            print("step %d, training accuracy %g" % (i, train_accuracy))
+        # Run the training step
 
-    # Occasionally report accuracy
-    if i % 500 == 0:
-        print("step %d, training accuracy %g" % (i, train_accuracy))
 
-    # Run the training step
-"""
-sess.run(train_step, feed_dict={x: batch[0], y: batch[1]})
 
 """
 from sklearn.metrics import average_precision_score
-
 predict = model.predict(np.array(test))
 true = [int(x) for x in np.append(np.ones(100), np.zeros(len(test) - 100), axis=0)]
 print(average_precision_score(true, predict))
-
 """
