@@ -18,8 +18,8 @@ TF_NUM = 123
 ROWS_NUM=1000
 EPOCHS = 5
 BATCH_SIZE = 100
-path = os.getcwd()
-# path = "/home/u12784/bio/BioProject/TF13"
+# path = os.getcwd()
+path = "/home/u12784/bio/BioProject/TF13"
 
 
 def oneHot(string):
@@ -32,7 +32,7 @@ def oneHot(string):
 def read_selex_csv_to_array(experiment_name, selex_num, rows_to_read, train_data=True):
     #path = os.path.join(os.path.expanduser('~'), 'hello-world','train/' if train_data else 'test/')
     path = "/home/u12784/bio/BioProject/TF13"
-    path = os.getcwd()
+    #path = os.getcwd()
     while(1):
         selex_name = path +'/'+ experiment_name + '_selex_' + str(selex_num) + '.txt'
         if os.path.isfile(selex_name):
