@@ -6,7 +6,7 @@ from sklearn.metrics import average_precision_score
 
 # local variables
 TF_NUM = 13
-ROWS_NUM=1000
+ROWS_NUM=200000
 EPOCHS = 5
 BATCH_SIZE = 200
 BUFFER = 200
