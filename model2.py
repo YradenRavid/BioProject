@@ -11,7 +11,7 @@ EPOCHS = 5
 BATCH_SIZE = 200
 BUFFER = 200
 #path = os.getcwd()
-TB_path = "/home/u12784/bio/BioProject"
+TB_path = "/home/u12784/bio/model2"
 
 
 def oneHot(string):
