@@ -117,8 +117,6 @@ test_data = [test, true_order]
 x = tf.placeholder(tf.float32, shape=[None, input_data.shape[1] , 4], name="input")
 y = tf.placeholder(tf.float32, shape=[None, 10], name="labels")
 x_seq = tf.reshape(x, [-1, input_data.shape[1] * 4, 1, 1])
-
-
 batch_size = tf.placeholder(tf.int64)
 #tf.summary.image("input", x_seq, 3)
 
@@ -129,7 +127,6 @@ dataset = dataset.shuffle(buffer_size=BUFFER)
 # init data
 iter = dataset.make_initializable_iterator()
 seqs, seqs_val = iter.get_next()
-
 
 
 # Create the network
@@ -162,12 +159,14 @@ with tf.name_scope("accuracy"):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar("accuracy", accuracy)
 
+"""
 with tf.name_scope("AUPR"):
-    test_label = logits_to_perc(logits)
-    aupr_true = tf.reduce_max(seqs_val,axis=1)
-    AUPR = average_precision_score(aupr_true,test_label)
-    tf.summary.scalar("AUPR", AUPR)
-
+    with sess.as_default():
+        test_label = logits_to_perc(logits)
+        aupr_true = tf.reduce_max(seqs_val,axis=1)
+        AUPR = average_precision_score(aupr_true.eval(),test_label.eval())
+        tf.summary.scalar("AUPR", AUPR)
+"""
 
 # combine all summaries:
 merged_summary = tf.summary.merge_all()
@@ -179,8 +178,7 @@ sess.run(tf.global_variables_initializer())
 writer = tf.summary.FileWriter(TB_path + '/graph')
 writer.add_graph(sess.graph)
 
-sess.run(iter.initializer, feed_dict={ x: train_data[0], y: train_data[1], batch_size: BATCH_SIZE})
-print('Training...')
+sess.run(iter.initializer, feed_dict={x: train_data[0], y: train_data[1], batch_size: BATCH_SIZE})
 
 # Train for 2001 step
 
@@ -190,15 +188,15 @@ for i in range(2001):
         # check accuracy and loss while taining
         [train_accuracy, loss ,s] = sess.run([accuracy, cross_entropy, merged_summary], feed_dict={x: train_data[0], y: train_data[1] , batch_size: BATCH_SIZE})
         # check test (AUPR of PBM)
-        sess.run(iter.initializer,
-                 feed_dict={x: test_data[0], y: test_data[1], batch_size: test_data[0].shape[0]})
-        [test_AUPR, s] = sess.run([AUPR, merged_summary],
-                                             feed_dict={x: test_data[0], y: test_data[1], batch_size: test_data[0].shape[0]})
         writer.add_summary(s, i)
     # Occasionally report accuracy
     if i % 500 == 0:
-        print("step %d, training accuracy %g loss is %g AUPR %g" % (i, train_accuracy, loss, test_AUPR))
+        print("step %d, training accuracy %g loss is %g" % (i, train_accuracy, loss))
 
     # Run the training step
 
+sess.run(iter.initializer, feed_dict={x: test_data[0], y: test_data[1], batch_size: test_data[0].shape[0]})
+#[test_AUPR, s] = sess.run([AUPR, merged_summary],feed_dict={x: test_data[0], y: test_data[1], batch_size: test_data[0].shape[0]})
+
+print('Test Loss: {:4f}'.format(sess.run(cross_entropy)))
 
